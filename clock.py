@@ -1,9 +1,10 @@
-from apscheduler.schedulers.blocking import BlockingScheduler
 
-sched = BlockingScheduler()
-
-@sched.scheduled_job('interval', minutes=3)
 def timed_job():
-    print('This job is run every three minutes.')
+    print 'This job is run every 10 minutes.\n\n'
 
-sched.start()
+
+def main():
+    timed_job()
+
+if __name__ == '__main__':
+    main()
