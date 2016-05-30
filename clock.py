@@ -1,7 +1,7 @@
 import time
 
 def timed_job():
-    print 'This job is run every 10 minutes.\n\n'
+    print '\n\n\tThis job is run every 10 minutes.\n\n'
 
 
 def main():
