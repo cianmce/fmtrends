@@ -40,6 +40,7 @@ def get_mbid(track, artist):
     if result['opensearch:totalResults'] <= 0:
         return None
     track = result['trackmatches']['track'][0]
+    print json.dumps(track)
     return track['mbid']
 
 
