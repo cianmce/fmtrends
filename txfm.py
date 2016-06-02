@@ -103,6 +103,7 @@ def get_tracks(soup, limit=None):
             'title' : title,
             'img'   : img,
             'key'   : key,
+            'count' : 0,
         }
         lastfm_info = get_lastfm_info(track['title'], track['artist'])
         if lastfm_info:
@@ -239,11 +240,10 @@ def add_plays(tracks, show):
     now_playings = db.plays.find(query)
     for play in now_playings:
         # check if still play
-        # set now_playing to false if not
         if play['track_id'] in track_ids:
             track_ids.remove(play['track_id'])
         else:
-            # update to not playing
+            # set now_playing to false
             query = {
                 '_id': play['_id']
             }
@@ -263,8 +263,15 @@ def add_plays(tracks, show):
             'played_at' : datetime.datetime.now(),
             'now_playing': True
         }
-        # print play
         db.plays.insert(play)
+        # count++
+        query = {
+            '_id': track_id
+        }
+        update = {
+            '$inc': {'count': 1}
+        }
+        db.tracks.update(query, update)
 
 def add_current_track(tracks):
     url = 'http://www.txfm.ie/assets/includes/ajax/player_info.php?type=On+Air&currentstationID=11'
@@ -278,6 +285,7 @@ def add_current_track(tracks):
         'title' : title,
         'img'   : '',
         'key'   : key,
+        'count' : 0,
     }
     lastfm_info = get_lastfm_info(current_track['title'], current_track['artist'])
     if lastfm_info:
@@ -300,8 +308,8 @@ def cron():
     show = add_show(show)
     # print show
     tracks = get_tracks(soup)
-    # add tracks/get their _ids
     tracks = add_current_track(tracks)
+    # add tracks/get their _ids
     tracks = upsert_tracks(tracks)
     # print tracks
     add_plays(tracks, show)
