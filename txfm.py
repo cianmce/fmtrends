@@ -305,6 +305,7 @@ def cron():
     tracks = upsert_tracks(tracks)
     # print tracks
     add_plays(tracks, show)
+    print 'updated'
 
 def main():
     cron()
