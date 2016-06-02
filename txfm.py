@@ -306,6 +306,31 @@ def add_current_track(tracks):
         print '\n\tNot in!'
         print current_track
         tracks.append(current_track)
+
+    # next artist
+    artist   = response['nextArtist']
+    title    = response['nextTitle']
+    if not artist or not title:
+        return tracks
+    key      = get_key(artist, title)
+    current_track = {
+        'artist': artist,
+        'title' : title,
+        'img'   : '',
+        'key'   : key,
+        # 'count' : 0,
+    }
+    lastfm_info = get_lastfm_info(current_track['title'], current_track['artist'])
+    if lastfm_info:
+        current_track['mbid']       = lastfm_info['mbid']
+        current_track['lastfm_url'] = lastfm_info['url']
+
+    track_keys = [track['key'] for track in tracks]
+    if current_track['key'] not in track_keys:
+        print '\n\tNot in!'
+        print current_track
+        tracks.append(current_track)
+
     return tracks
 
 def cron():
