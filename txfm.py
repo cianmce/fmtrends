@@ -42,7 +42,6 @@ db = mongo_client.get_default_database()
 BASE_URL = 'http://www.txfm.ie'
 STATION  = 'TXFM'
 
-
 def get_lastfm_info(track, artist):
 
     url = 'http://ws.audioscrobbler.com/2.0/'
