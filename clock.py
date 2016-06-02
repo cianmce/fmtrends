@@ -1,7 +1,12 @@
 import time
 from txfm import cron as tx_cron
 
+import logging
+logging.basicConfig()
+
 from apscheduler.schedulers.blocking import BlockingScheduler
+
+
 
 sched = BlockingScheduler()
 
