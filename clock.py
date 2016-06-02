@@ -1,4 +1,5 @@
 import time
+from txfm import cron as tx_cron
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -6,9 +7,8 @@ sched = BlockingScheduler()
 
 @sched.scheduled_job('interval', minutes=3)
 def timed_job():
-    print 'Doing stuff every 3 mins'
-    time.sleep(30)
-    print 'Done'
+    print 'txfm'
+    tx_cron()
 
 
 sched.start()

@@ -21,8 +21,9 @@
 
 // Plays collection
 {
-  "track": ObjectId("1234"),
-  "show": ObjectId("abcd"),
+  "track_id": ObjectId("1234"),
+  "show_id": ObjectId("abcd"),
+  "station": "TXFM"
   "played_at": "5/30/2016, 3:34:04 PM",
-  "now_playing": true,
+  "now_playing": true
 }

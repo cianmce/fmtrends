@@ -29,15 +29,18 @@ import re
 import json
 from urlparse import urljoin
 from pymongo import MongoClient
+from pymongo.errors import BulkWriteError
 from bson.objectid import ObjectId
+import datetime
+import os
 
-
-
-MONGODB_URI  = 'mongodb://localhost/fmtrends'
+MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost/fmtrends')
+print 'MONGODB_URI:',MONGODB_URI
 mongo_client = MongoClient(MONGODB_URI)
 db = mongo_client.get_default_database()
 
 BASE_URL = 'http://www.txfm.ie'
+STATION  = 'TXFM'
 
 
 def get_lastfm_info(track, artist):
@@ -72,13 +75,15 @@ def alphanumeric(s):
     pattern = re.compile('[\W_]+')
     return pattern.sub('', s)
 
-def get_tracks(soup):
+def get_tracks(soup, limit=None):
     """
         returns array of all songs with newest at index 0
     """
 
     thumbnails = soup.findAll('div', {'class','thumbnail'})
     thumbnails = thumbnails[1:]
+    if limit:
+        thumbnails = thumbnails[:limit]
     tracks = []
 
     for thumbnail in thumbnails:
@@ -95,7 +100,6 @@ def get_tracks(soup):
             'title' : title,
             'img'   : img,
             'key'   : key,
-            "now_playing": True
         }
         lastfm_info = get_lastfm_info(track['title'], track['artist'])
         if lastfm_info:
@@ -129,6 +133,7 @@ def get_show(soup):
     img = urljoin(BASE_URL, img)
 
     show = {
+        "station"    : STATION,
         "title"      : title,
         "url"        : url, 
         "start_time" : start_time, 
@@ -139,21 +144,138 @@ def get_show(soup):
     }
     return show
 
-def cron():
+def get_soup():
     url = BASE_URL
     r = requests.get(url)
     html = r.text
-    print r.status_code
+    # print r.status_code
     if r.status_code != 200:
         return False
-    soup   = BeautifulSoup(html, "html.parser")
-    show   = get_show(soup)
+    return BeautifulSoup(html, "html.parser")
+
+def add_show(show):
+    """
+        returns show+_id
+    """
+    # turn of now playing
+    query = {
+        'now_playing': True
+    }
+    update = {
+        '$set':{
+            'now_playing': False        
+        }
+    }
+    db.shows.update(query, update)
+    # Add/update show
+    # Find by title
+    query = {
+        'title': show['title']
+    }
+    update = {
+        '$set': show
+    }
+    r = db.shows.update(query, update, upsert=True)
+    print r
+    return db.shows.find_one(query)
+
+def add_tracks(tracks):
+    tracks_updated = []
+
+    bulk = db.tracks.initialize_unordered_bulk_op()
+
+
+    for track in tracks:
+        # insert/update track
+        # search by 'key'
+        query = {
+            'key': track['key']
+        }
+        update = {
+            '$set': track
+        }
+        r = bulk.find(query).upsert().update(update)
+    try:
+        print 'trying insert'
+        r=bulk.execute()
+        print r
+    except BulkWriteError as bwe:
+        print 'err:'
+        print(bwe.details)
+        return False
+
+    # get _id's
+    for track in tracks:
+        # insert/update track
+        # search by 'key'
+        query = {
+            'key': track['key']
+        }
+        track = db.tracks.find_one(query)
+        tracks_updated.append(track)
+
+    return tracks_updated
+
+def add_plays(tracks, show):
+    """
+    {
+        "track_id": ObjectId("1234"),
+        "show_id": ObjectId("abcd"),
+        "station": "TXFM"
+        "played_at": "5/30/2016, 3:34:04 PM",
+        "now_playing": true
+    }
+    """
+    track_ids = [track['_id'] for track in tracks]
+    print track_ids
+    # get all now_playing from this station
+    query = {
+        'now_playing': True,
+        'station'    : STATION
+    }
+    now_playings = db.plays.find(query)
+    for play in now_playings:
+        # check if still play
+        # set now_playing to false if not
+        if play['track_id'] in track_ids:
+            track_ids.remove(play['track_id'])
+        else:
+            # update to not playing
+            query = {
+                '_id': play['_id']
+            }
+            update = {
+                '$set':{
+                    'now_playing': False
+                }
+            }
+            r = db.plays.update(query, update)
+
+    # tracks not added as playing yet
+    for track_id in track_ids:
+        play = {
+            'track_id'  : track_id,
+            'show_id'   : show['_id'],
+            'station'   : STATION,
+            'played_at' : datetime.datetime.now(),
+            'now_playing': True
+        }
+        print play
+        db.plays.insert(play)
+
+def cron():
+    soup = get_soup()
+    if not soup:
+        return
+    show = get_show(soup)
+    # ensure show is added/get _id
+    show = add_show(show)
     print show
     tracks = get_tracks(soup)
-    print json.dumps(tracks)
-
-    # 
-
+    # add tracks/get their _ids
+    tracks = add_tracks(tracks)
+    print tracks
+    add_plays(tracks, show)
 
 def main():
     cron()
