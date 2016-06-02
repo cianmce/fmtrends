@@ -281,6 +281,8 @@ def add_current_track(tracks):
     response = r.json()
     artist   = response['currentArtist']
     title    = response['currentTitle']
+    if not artist or not title:
+        return tracks
     key      = get_key(artist, title)
     current_track = {
         'artist': artist,
