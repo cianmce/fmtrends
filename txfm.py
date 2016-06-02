@@ -274,9 +274,14 @@ def add_plays(tracks, show):
             '$inc': {'count': 1}
         }
         db.tracks.update(query, update)
+        track = db.tracks.find_one({'_id': track_id})
+        print 'adding track:'
+        print track
 
 def add_current_track(tracks):
-    url = 'http://www.txfm.ie/assets/includes/ajax/player_info.php?type=On+Air&currentstationID=11'
+    url = '/assets/includes/ajax/player_info.php?type=On+Air&currentstationID=11'
+    url = urljoin(BASE_URL, url)
+
     r = requests.get(url)
     response = r.json()
     artist   = response['currentArtist']
