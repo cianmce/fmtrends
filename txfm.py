@@ -71,6 +71,8 @@ def get_lastfm_info(track, artist):
 
 
 def alphanumeric(s):
+    if not s:
+        return ''
     pattern = re.compile('[\W_]+')
     return pattern.sub('', s)
 
