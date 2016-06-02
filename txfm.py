@@ -103,7 +103,7 @@ def get_tracks(soup, limit=None):
             'title' : title,
             'img'   : img,
             'key'   : key,
-            'count' : 0,
+            # 'count' : 0,
         }
         lastfm_info = get_lastfm_info(track['title'], track['artist'])
         if lastfm_info:
@@ -285,7 +285,7 @@ def add_current_track(tracks):
         'title' : title,
         'img'   : '',
         'key'   : key,
-        'count' : 0,
+        # 'count' : 0,
     }
     lastfm_info = get_lastfm_info(current_track['title'], current_track['artist'])
     if lastfm_info:
