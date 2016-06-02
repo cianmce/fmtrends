@@ -17,6 +17,7 @@ def timed_job():
 
 
 sched.start()
+timed_jobO()
 
 
 
