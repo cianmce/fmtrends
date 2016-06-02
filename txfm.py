@@ -75,6 +75,13 @@ def alphanumeric(s):
     pattern = re.compile('[\W_]+')
     return pattern.sub('', s)
 
+def get_key(artist, title):
+    key = '{artist}-{song}'.format(
+                artist = alphanumeric(artist).lower(), 
+                song   = alphanumeric(title).lower()
+            )
+    return key
+
 def get_tracks(soup, limit=None):
     """
         returns array of all songs with newest at index 0
@@ -91,10 +98,7 @@ def get_tracks(soup, limit=None):
         artist  = heading[0]
         title   = heading[1]
         img     = thumbnail.find('img').attrs['src']
-        key     = '{artist}-{song}'.format(
-                artist = alphanumeric(artist).lower(), 
-                song   = alphanumeric(title).lower()
-            )
+        key     = get_key(artist, title)
         track = {
             'artist': artist,
             'title' : title,
@@ -176,10 +180,10 @@ def add_show(show):
         '$set': show
     }
     r = db.shows.update(query, update, upsert=True)
-    print r
+    # print r
     return db.shows.find_one(query)
 
-def add_tracks(tracks):
+def upsert_tracks(tracks):
     tracks_updated = []
 
     bulk = db.tracks.initialize_unordered_bulk_op()
@@ -196,9 +200,9 @@ def add_tracks(tracks):
         }
         r = bulk.find(query).upsert().update(update)
     try:
-        print 'trying insert'
+        # print 'trying insert'
         r=bulk.execute()
-        print r
+        # print r
     except BulkWriteError as bwe:
         print 'err:'
         print(bwe.details)
@@ -227,7 +231,7 @@ def add_plays(tracks, show):
     }
     """
     track_ids = [track['_id'] for track in tracks]
-    print track_ids
+    # print track_ids
     # get all now_playing from this station
     query = {
         'now_playing': True,
@@ -260,8 +264,33 @@ def add_plays(tracks, show):
             'played_at' : datetime.datetime.now(),
             'now_playing': True
         }
-        print play
+        # print play
         db.plays.insert(play)
+
+def add_current_track(tracks):
+    url = 'http://www.txfm.ie/assets/includes/ajax/player_info.php?type=On+Air&currentstationID=11'
+    r = requests.get(url)
+    response = r.json()
+    artist   = response['currentArtist']
+    title    = response['currentTitle']
+    key      = get_key(artist, title)
+    current_track = {
+        'artist': artist,
+        'title' : title,
+        'img'   : '',
+        'key'   : key,
+    }
+    lastfm_info = get_lastfm_info(current_track['title'], current_track['artist'])
+    if lastfm_info:
+        current_track['mbid']       = lastfm_info['mbid']
+        current_track['lastfm_url'] = lastfm_info['url']
+
+    track_keys = [track['key'] for track in tracks]
+    if current_track['key'] not in track_keys:
+        print '\n\tNot in!'
+        print current_track
+        tracks.append(current_track)
+    return tracks
 
 def cron():
     soup = get_soup()
@@ -270,11 +299,12 @@ def cron():
     show = get_show(soup)
     # ensure show is added/get _id
     show = add_show(show)
-    print show
+    # print show
     tracks = get_tracks(soup)
     # add tracks/get their _ids
-    tracks = add_tracks(tracks)
-    print tracks
+    tracks = add_current_track(tracks)
+    tracks = upsert_tracks(tracks)
+    # print tracks
     add_plays(tracks, show)
 
 def main():
