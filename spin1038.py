@@ -24,7 +24,6 @@ ct6dtH8LDWN3w7Gs6qJyUw  W6hRBIWvquICL_s2ELgGig
 """
 
 import requests
-from bs4 import BeautifulSoup
 import re
 import json
 from urlparse import urljoin
@@ -39,8 +38,8 @@ print 'MONGODB_URI:',MONGODB_URI
 mongo_client = MongoClient(MONGODB_URI)
 db = mongo_client.get_default_database()
 
-BASE_URL = 'http://www.txfm.ie'
-STATION  = 'TXFM'
+BASE_URL = 'http://www.spin1038.com/'
+STATION  = 'SPIN1038'
 
 def get_lastfm_info(track, artist):
 
@@ -55,11 +54,10 @@ def get_lastfm_info(track, artist):
     }
     r = requests.get(url, params=params)
     result = r.json()['results']
-    if int(result['opensearch:totalResults']) <= 0 or len(result['trackmatches']['track']) <= 0:
+    if int(result['opensearch:totalResults']) <= 0:
         # print artist
         # print track
         return None
-
     track = result['trackmatches']['track'][0]
     mbid = track['mbid'] or None
     url  = track['url'] or None
@@ -83,82 +81,6 @@ def get_key(artist, title):
                 song   = alphanumeric(title).lower()
             )
     return key
-
-def get_tracks(soup, limit=None):
-    """
-        returns array of all songs with newest at index 0
-    """
-
-    thumbnails = soup.findAll('div', {'class','thumbnail'})
-    thumbnails = thumbnails[1:]
-    if limit:
-        thumbnails = thumbnails[:limit]
-    tracks = []
-
-    for thumbnail in thumbnails:
-        heading = thumbnail.text.strip().split(' - ', 1)
-        artist  = heading[0]
-        title   = heading[1]
-        img     = thumbnail.find('img').attrs['src']
-        key     = get_key(artist, title)
-        track = {
-            'artist': artist,
-            'title' : title,
-            'img'   : img,
-            'key'   : key,
-            # 'count' : 0,
-        }
-        lastfm_info = get_lastfm_info(track['title'], track['artist'])
-        if lastfm_info:
-            track['mbid']        = lastfm_info['mbid']
-            track['lastfm_url'] = lastfm_info['url']
-        tracks.append(track)
-    return tracks
-
-def get_show(soup):
-    header = soup.find('div', {'class','home_header'})
-    show_link = header.find('h1').find('a')
-    # title and url
-    url   = show_link.attrs['href']
-    title = show_link.text
-
-    # time
-    full_time   = header.find('p').text
-    match = re.findall('(\d+\:\d+) - (\d+\:\d+)', full_time)
-    start_time = None
-    end_time   = None
-    if len(match) > 0:
-        start_time = match[0][0]
-        end_time   = match[0][1]
-
-    # description
-    description = header.find('h3').text.strip()
-
-    # get image
-    img = soup.find('div', {'class','show_home'}).find('img').attrs['src']
-    url = urljoin(BASE_URL, url)
-    img = urljoin(BASE_URL, img)
-
-    show = {
-        "station"    : STATION,
-        "title"      : title,
-        "url"        : url, 
-        "start_time" : start_time, 
-        "end_time"   : end_time,
-        "description": description,
-        "image"      : img,
-        "now_playing": True
-    }
-    return show
-
-def get_soup():
-    url = BASE_URL
-    r = requests.get(url)
-    html = r.text
-    # print r.status_code
-    if r.status_code != 200:
-        return False
-    return BeautifulSoup(html, "html.parser")
 
 def add_show(show):
     """
@@ -237,16 +159,8 @@ def add_plays(tracks, show):
     # print track_ids
     # get all now_playing from this station
     query = {
-        'station': STATION,
-        # now_playing or within 45 mins
-        '$or': [{
-            'played_at'  :{
-                '$gt': datetime.datetime.now() - datetime.timedelta(minutes=45)
-            }
-        },{
-            'now_playing': True,
-        }]
-
+        'now_playing': True,
+        'station'    : STATION
     }
     now_playings = db.plays.find(query)
     for play in now_playings:
@@ -283,14 +197,10 @@ def add_plays(tracks, show):
             '$inc': {'count': 1}
         }
         db.tracks.update(query, update)
-        track = db.tracks.find_one({'_id': track_id})
-        print 'adding track:'
-        print track
 
 def add_current_track(tracks):
-    url = '/assets/includes/ajax/player_info.php?type=On+Air&currentstationID=11'
+    url = '/assets/includes/ajax/player_info.php?type=On+Air&currentstationID=3'
     url = urljoin(BASE_URL, url)
-
     r = requests.get(url)
     response = r.json()
     artist   = response['currentArtist']
@@ -315,42 +225,14 @@ def add_current_track(tracks):
         print '\n\tNot in!'
         print current_track
         tracks.append(current_track)
-
-    # next artist
-    artist   = response['nextArtist']
-    title    = response['nextTitle']
-    if not artist or not title:
-        return tracks
-    key      = get_key(artist, title)
-    current_track = {
-        'artist': artist,
-        'title' : title,
-        'img'   : '',
-        'key'   : key,
-        # 'count' : 0,
-    }
-    lastfm_info = get_lastfm_info(current_track['title'], current_track['artist'])
-    if lastfm_info:
-        current_track['mbid']       = lastfm_info['mbid']
-        current_track['lastfm_url'] = lastfm_info['url']
-
-    track_keys = [track['key'] for track in tracks]
-    if current_track['key'] not in track_keys:
-        print '\n\tNot in!'
-        print current_track
-        tracks.append(current_track)
-
     return tracks
 
-def cron():
-    soup = get_soup()
-    if not soup:
-        return
+def cron()
     show = get_show(soup)
     # ensure show is added/get _id
     show = add_show(show)
     # print show
-    tracks = get_tracks(soup, limit=12)
+    tracks = get_tracks(soup)
     tracks = add_current_track(tracks)
     # add tracks/get their _ids
     tracks = upsert_tracks(tracks)
