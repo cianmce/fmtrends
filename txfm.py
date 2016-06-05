@@ -236,8 +236,16 @@ def add_plays(tracks, show):
     # print track_ids
     # get all now_playing from this station
     query = {
-        'now_playing': True,
-        'station'    : STATION
+        'station': STATION,
+        # now_playing or within 15 mins
+        '$or': [{
+            'played_at'  :{
+                '$gt': datetime.datetime.now() - datetime.timedelta(minutes=15)
+            }
+        },{
+            'now_playing': True,
+        }]
+
     }
     now_playings = db.plays.find(query)
     for play in now_playings:
