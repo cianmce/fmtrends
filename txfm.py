@@ -195,6 +195,10 @@ def upsert_tracks(tracks):
     for track in tracks:
         # insert/update track
         # search by 'key'
+        # if any properties are null remove them
+        for key in track.keys():
+            if track[key] in [None, '']:
+                track.pop(key, None)
         query = {
             'key': track['key']
         }
